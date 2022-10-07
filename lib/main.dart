@@ -179,12 +179,12 @@ Future<void> initializeService() async {
       foregroundServiceNotificationTitle: 'Location Alarm',
       foregroundServiceNotificationContent: 'handling background',
       onStart: onStart,
-      autoStart: true,
+      autoStart: false,
       isForegroundMode: true,
     ),
     iosConfiguration: IosConfiguration(
       // auto start service
-      autoStart: true,
+      autoStart: false,
 
       // this will be executed when app is in foreground in separated isolate
       onForeground: onStart,
@@ -206,8 +206,9 @@ Future<bool> onStart(ServiceInstance service) async {
         final destinationLat = event![ConstantData.destinationLatKey];
         final destinationLong = event[ConstantData.destinationLongKey];
         final destinationName = event[ConstantData.destinationNameKey];
-        final consideredDistance =
-            double.tryParse(event[ConstantData.tripConsideredDistanceKey]) ?? 1000.0;
+        final consideredDistance = double.tryParse(
+                event[ConstantData.tripConsideredDistanceKey].toString()) ??
+            1000.0;
 
         backTask(
           destinationLat: destinationLat,
@@ -216,6 +217,8 @@ Future<bool> onStart(ServiceInstance service) async {
           consideredDistance: consideredDistance,
         );
       } catch (e) {
+        await NotificationUtils.showNotificationWithWatchDelay(
+            body: 'You faced an error: $e');
         await BackgroundServiceUtils.instance.setIsTracingTravel(false);
         service.stopSelf();
       }
@@ -240,10 +243,13 @@ Future<bool> onStart(ServiceInstance service) async {
       await Future.delayed(const Duration(seconds: 3), () {});
     }
     await saveRecord(
-        destinationName: event![ConstantData.destinationNameKey],
-        destinationLat: event[ConstantData.destinationLatKey],
-        destinationLong: event[ConstantData.destinationLongKey],
-        consideredDistance: event[ConstantData.tripConsideredDistanceKey]);
+      destinationName: event![ConstantData.destinationNameKey],
+      destinationLat: event[ConstantData.destinationLatKey],
+      destinationLong: event[ConstantData.destinationLongKey],
+      consideredDistance: double.tryParse(
+              event[ConstantData.tripConsideredDistanceKey].toString()) ??
+          0.0,
+    );
 
     await BackgroundServiceUtils.instance.setIsTracingTravel(false);
     service.stopSelf();
@@ -259,10 +265,10 @@ Future<bool> onStart(ServiceInstance service) async {
 }
 
 Future<void> saveRecord({
-  required destinationName,
-  required destinationLat,
-  required destinationLong,
-  required consideredDistance,
+  required String destinationName,
+  required double destinationLat,
+  required double destinationLong,
+  required double consideredDistance,
 }) async {
   try {
     final db =
@@ -278,7 +284,7 @@ Future<void> saveRecord({
     await db.close();
   } catch (e) {
     await NotificationUtils.showNotification(
-        body: "Could not save the travel history =>${e.toString()}");
+        body: "Could not save the travel history: ${e.toString()}");
   }
 }
 

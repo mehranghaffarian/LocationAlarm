@@ -118,7 +118,7 @@ class _Counter extends StatelessWidget {
             size: 30,
           ),
           onTap: () {
-            if (notifCounterCubit.state <= 20) {
+            if (notifCounterCubit.state < 20) {
               notifCounterCubit.increment();
             } else {
               context.showSnack(
