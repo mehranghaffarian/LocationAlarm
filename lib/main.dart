@@ -20,8 +20,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await initializeService();
-  await Hive.initFlutter();
-  Hive.registerAdapter(TravelEntityAdapter());
+  await initDB();
 
   runApp(const LocationAlarm());
 }
@@ -63,10 +62,12 @@ class _LocationAlarmState extends State<LocationAlarm> {
           titleSmall: TextStyle(
             fontSize: 15,
             color: Color.fromRGBO(65, 135, 44, 1.0),
-          ),titleLarge: TextStyle(
-          fontSize: 19,fontWeight: FontWeight.bold,
-          color: Color.fromRGBO(150, 20, 20, 1.0),
-        ),
+          ),
+          titleLarge: TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.bold,
+            color: Color.fromRGBO(150, 20, 20, 1.0),
+          ),
         ),
       ),
       debugShowCheckedModeBanner: false,
@@ -104,7 +105,7 @@ class _LocationAlarmState extends State<LocationAlarm> {
 
   _fetchSettings() async {
     ConstantData.arrivedNotifCount = (await SharedPreferences.getInstance())
-        .getInt(ConstantData.arrivedNotifCountKey) ??
+            .getInt(ConstantData.arrivedNotifCountKey) ??
         5;
   }
 }
@@ -118,8 +119,8 @@ Future<dynamic> backTask({
   await BackgroundServiceUtils.instance.setIsTracingTravel(true);
 
   NotificationUtils.showNotification(
-      body:
-      "now Im in the background, I will let you know when you have arrived.",
+    body:
+        "now Im in the background, I will let you know when you have arrived.",
   );
 
   while (true) {
@@ -128,11 +129,11 @@ Future<dynamic> backTask({
     if (currentPosition == null) {
       NotificationUtils.showNotification(
           body:
-          "I could not get your location, trying again in 10 seconds....");
+              "I could not get your location, trying again in 10 seconds....");
       await Future.delayed(
           const Duration(seconds: 10),
-              () async =>
-          currentPosition = await PositionUtils.getCurrentPosition());
+          () async =>
+              currentPosition = await PositionUtils.getCurrentPosition());
       if (currentPosition == null) {
         await NotificationUtils.showNotificationWithWatchDelay(
           body: 'I could not get your location',
@@ -158,8 +159,11 @@ Future<dynamic> backTask({
       final service = BackgroundServiceUtils.instance.backService;
 
       service.invoke(ConstantData.userArrived, {
-        'distance': distance,
-        'destinationName': destinationName,
+        ConstantData.tripDistanceKey: distance,
+        ConstantData.destinationNameKey: destinationName,
+        ConstantData.destinationLatKey: destinationLat,
+        ConstantData.destinationLongKey: destinationLon,
+        ConstantData.tripConsideredDistanceKey: consideredDistance,
       });
       return true;
     } else {
@@ -175,7 +179,7 @@ Future<void> initializeService() async {
       foregroundServiceNotificationTitle: 'Location Alarm',
       foregroundServiceNotificationContent: 'handling background',
       onStart: onStart,
-      autoStart: false,
+      autoStart: true,
       isForegroundMode: true,
     ),
     iosConfiguration: IosConfiguration(
@@ -192,36 +196,24 @@ Future<void> initializeService() async {
 }
 
 Future<bool> onStart(ServiceInstance service) async {
-  await Hive.initFlutter();
-  Hive.registerAdapter(TravelEntityAdapter());
+  await initDB();
 
   DartPluginRegistrant.ensureInitialized();
 
   service.on(ConstantData.chasingLocationTaskName).listen((event) async {
     if (!(await BackgroundServiceUtils.instance.isTracingTravel)) {
-      final db =
-      await Hive.openBox<TravelEntity>(ConstantData.travelsDatabaseName);
       try {
         final destinationLat = event![ConstantData.destinationLatKey];
         final destinationLong = event[ConstantData.destinationLongKey];
         final destinationName = event[ConstantData.destinationNameKey];
-        final distance = await _getConsideredDistance(
-            event[ConstantData.tripDistanceKey]);
-
-        db.add(TravelEntity(
-          consideredDistance: distance,
-          destinationName: destinationName,
-          destinationLat: destinationLat,
-          destinationLong: destinationLong,
-          date: DateTime.now(),
-        ));
-        db.close();
+        final consideredDistance =
+            double.tryParse(event[ConstantData.tripConsideredDistanceKey]) ?? 1000.0;
 
         backTask(
           destinationLat: destinationLat,
           destinationLon: destinationLong,
           destinationName: destinationName,
-          consideredDistance: distance,
+          consideredDistance: consideredDistance,
         );
       } catch (e) {
         await BackgroundServiceUtils.instance.setIsTracingTravel(false);
@@ -234,18 +226,25 @@ Future<bool> onStart(ServiceInstance service) async {
   });
   service.on(ConstantData.userArrived).listen((event) async {
     final notifCount = (await SharedPreferences.getInstance())
-        .getInt(ConstantData.arrivedNotifCountKey) ??
+            .getInt(ConstantData.arrivedNotifCountKey) ??
         ConstantData.arrivedNotifCount;
 
     for (int i = 1; i <= notifCount; i++) {
       await NotificationUtils.showNotification(
         payload: 'payload',
-        title: 'you have arrived to ${event!['destinationName']}',
-        body: 'distance: ${event['distance']}',
+        title: 'you have arrived to ${event![ConstantData.destinationNameKey]}',
+        body:
+            'distance: ${event[ConstantData.tripDistanceKey]}, considered distance: ${event[ConstantData.tripConsideredDistanceKey]}',
         ID: i,
       );
       await Future.delayed(const Duration(seconds: 3), () {});
     }
+    await saveRecord(
+        destinationName: event![ConstantData.destinationNameKey],
+        destinationLat: event[ConstantData.destinationLatKey],
+        destinationLong: event[ConstantData.destinationLongKey],
+        consideredDistance: event[ConstantData.tripConsideredDistanceKey]);
+
     await BackgroundServiceUtils.instance.setIsTracingTravel(false);
     service.stopSelf();
   });
@@ -259,12 +258,31 @@ Future<bool> onStart(ServiceInstance service) async {
   return true;
 }
 
-Future<double> _getConsideredDistance(value) async{
-  if (value is double) {
-    return value;
-  } else {
+Future<void> saveRecord({
+  required destinationName,
+  required destinationLat,
+  required destinationLong,
+  required consideredDistance,
+}) async {
+  try {
+    final db =
+        await Hive.openBox<TravelEntity>(ConstantData.travelsDatabaseName);
+
+    await db.add(TravelEntity(
+      consideredDistance: consideredDistance,
+      destinationName: destinationName,
+      destinationLat: destinationLat,
+      destinationLong: destinationLong,
+      date: DateTime.now(),
+    ));
+    await db.close();
+  } catch (e) {
     await NotificationUtils.showNotification(
-        body: 'Could not handle the considered distance, set to 1000.0(m)');
-    return 1000.0;
+        body: "Could not save the travel history =>${e.toString()}");
   }
+}
+
+Future<void> initDB() async {
+  await Hive.initFlutter();
+  Hive.registerAdapter(TravelEntityAdapter());
 }

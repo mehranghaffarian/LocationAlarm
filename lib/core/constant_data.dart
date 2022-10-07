@@ -16,4 +16,5 @@ abstract class ConstantData{
   static const destinationNameKey = "destinationNameKey";
   static const tripDateKey = "tripDateKey";
   static const tripDistanceKey = "tripDistanceKey";
+  static const tripConsideredDistanceKey = "tripConsideredDistanceKey";
 }

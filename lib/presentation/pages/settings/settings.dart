@@ -33,9 +33,10 @@ class Settings extends StatelessWidget {
                 ),
               ),
             ),
-            onTap: () async{
+            onTap: () async {
               ConstantData.arrivedNotifCount = _cubit.state;
-              (await SharedPreferences.getInstance()).setInt(ConstantData.arrivedNotifCountKey, _cubit.state);
+              (await SharedPreferences.getInstance())
+                  .setInt(ConstantData.arrivedNotifCountKey, _cubit.state);
 
               Navigator.of(context).pushNamed(HomePage.routeName);
             },
@@ -47,7 +48,8 @@ class Settings extends StatelessWidget {
         margin: const EdgeInsets.all(10),
         child: Column(
           children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Arrival Notifications Count: ',
                     style: TextStyle(
@@ -75,7 +77,8 @@ class _Counter extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Row(mainAxisSize: MainAxisSize.min,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         InkWell(
           child: Icon(
@@ -84,11 +87,11 @@ class _Counter extends StatelessWidget {
             size: 30,
           ),
           onTap: () {
-            if (notifCounterCubit.state < 20) {
+            if (notifCounterCubit.state > 1) {
               notifCounterCubit.decrement();
             } else {
               context.showSnack(
-                'Maximum number is 20',
+                'Minimum number is 1',
                 theme.errorColor,
               );
             }
@@ -115,12 +118,12 @@ class _Counter extends StatelessWidget {
             size: 30,
           ),
           onTap: () {
-            if (notifCounterCubit.state > 1) {
+            if (notifCounterCubit.state <= 20) {
               notifCounterCubit.increment();
             } else {
               context.showSnack(
-                'Minimum number is 1',
-                Colors.red,
+                'Maximum number is 20',
+                theme.errorColor,
               );
             }
           },

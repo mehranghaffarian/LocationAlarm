@@ -8,7 +8,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:location_alarm/core/constant_data.dart';
 import 'package:location_alarm/core/extensions/build_context_extension.dart';
 import 'package:location_alarm/core/notification_utils.dart';
-import 'package:location_alarm/domain/entities/travel/travel_entity.dart';
 import 'package:location_alarm/presentation/pages/home_page/home_bloc.dart';
 import 'package:location_alarm/presentation/pages/choose_destination/choose_destination_page.dart';
 import 'package:location_alarm/presentation/widgets/custom_app_bar.dart';
@@ -124,17 +123,16 @@ class HomePage extends StatelessWidget {
                       if (tripIsValid) {
                         final service =
                             BackgroundServiceUtils.instance.backService;
-                        final trip = TravelEntity(
-                          destinationName: destinationName.text.isEmpty
-                              ? 'unknown destination'
-                              : destinationName.text,
-                          destinationLat: double.parse(latController.text),
-                          destinationLong: double.parse(longController.text),
-                          consideredDistance:
-                              double.tryParse(distanceController.text) ??
-                                  1000.0,
-                          date: DateTime.now(),
-                        );
+
+                        final tripDestinationName = destinationName.text.isEmpty
+                            ? 'unknown destination'
+                            : destinationName.text;
+                        final tripDestinationLat =
+                            double.parse(latController.text);
+                        final tripDestinationLong =
+                            double.parse(longController.text);
+                        final tripConsideredDistance =
+                            await _getConsideredDistance(distanceController.text);
 
                         if (!(await BackgroundServiceUtils
                             .instance.isTracingTravel)) {
@@ -146,20 +144,23 @@ class HomePage extends StatelessWidget {
                               theme.backgroundColor,
                             );
                             _registerTrip(
-                              trip,
-                              service,
+                              destinationName: tripDestinationName,
+                              destinationLat: tripDestinationLat,
+                              destinationLong: tripDestinationLong,
+                              consideredDistance: tripConsideredDistance,
+                              service: service,
                             );
                           } else {
                             service
                                 .invoke(ConstantData.chasingLocationTaskName, {
                               ConstantData.destinationLatKey:
-                                  trip.destinationLat,
+                                  tripDestinationLat,
                               ConstantData.destinationLongKey:
-                                  trip.destinationLong,
+                                  tripDestinationLong,
                               ConstantData.destinationNameKey:
-                                  trip.destinationName,
-                              ConstantData.tripDistanceKey:
-                                  trip.consideredDistance,
+                                  tripDestinationName,
+                              ConstantData.tripConsideredDistanceKey:
+                                  tripConsideredDistance,
                             });
                           }
                         } else {
@@ -187,7 +188,8 @@ class HomePage extends StatelessWidget {
                       final service =
                           BackgroundServiceUtils.instance.backService;
 
-                      await BackgroundServiceUtils.instance.setIsTracingTravel(false);
+                      await BackgroundServiceUtils.instance
+                          .setIsTracingTravel(false);
                       if (await service.isRunning()) {
                         service.invoke(ConstantData.cancelTrip);
                       } else {
@@ -233,6 +235,38 @@ class HomePage extends StatelessWidget {
             const TextInputType.numberWithOptions(decimal: true),
       );
 
+  _registerTrip({
+    required FlutterBackgroundService service,
+    required destinationLat,
+    required destinationLong,
+    required destinationName,
+    required double consideredDistance,
+  }) {
+    Timer? tripTimer;
+
+    tripTimer = Timer(const Duration(seconds: 3), () async {
+      if (!(await BackgroundServiceUtils.instance.isTracingTravel)) {
+        if (await BackgroundServiceUtils.instance.backService.isRunning()) {
+          service.invoke(ConstantData.chasingLocationTaskName, {
+            ConstantData.destinationLatKey: destinationLat,
+            ConstantData.destinationLongKey: destinationLong,
+            ConstantData.destinationNameKey: destinationName,
+            ConstantData.tripConsideredDistanceKey: consideredDistance,
+          });
+          tripTimer!.cancel();
+        }
+      } else {
+        NotificationUtils.showNotification(
+            body: 'you have a registered trip first cancel it');
+      }
+      if ((tripTimer?.tick ?? 4) >= 4) {
+        NotificationUtils.showNotification(
+            body: 'could not register your trip?!');
+        tripTimer?.cancel();
+      }
+    });
+  }
+
   _buildChooseDestinationIcon({
     required BuildContext context,
     Color? color,
@@ -265,31 +299,19 @@ class HomePage extends StatelessWidget {
           size: size,
         ),
       );
+}
 
-  _registerTrip(TravelEntity trip, FlutterBackgroundService service) {
-    Timer? tripTimer;
-
-    tripTimer = Timer(const Duration(seconds: 3), () async {
-      if (!(await BackgroundServiceUtils.instance.isTracingTravel) ) {
-        if(await BackgroundServiceUtils.instance.backService.isRunning()){
-          service.invoke(ConstantData.chasingLocationTaskName, {
-            ConstantData.destinationLatKey: trip.destinationLat,
-            ConstantData.destinationLongKey: trip.destinationLong,
-            ConstantData.destinationNameKey: trip.destinationName,
-            ConstantData.tripDistanceKey: trip.consideredDistance,
-          });
-          tripTimer!.cancel();
-        }
-      }else {
-        NotificationUtils.showNotification(
-            body:
-            'you have a registered trip first cancel it');
-      }
-      if ((tripTimer?.tick ?? 4) >= 4) {
-        NotificationUtils.showNotification(
-            body: 'could not register your trip?!');
-        tripTimer?.cancel();
-      }
-    });
+Future<double> _getConsideredDistance(value) async {
+  if (value is double) {
+    return value;
+  } else {
+    final consideredDistance = double.tryParse(value);
+    if (consideredDistance is double) {
+      return consideredDistance;
+    } else {
+      await NotificationUtils.showNotification(
+          body: 'Could not handle the considered distance, set to 1000.0(m)');
+      return 1000.0;
+    }
   }
 }

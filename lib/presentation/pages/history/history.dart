@@ -157,9 +157,13 @@ class _HistoryState extends State<History> {
                                 Text(
                                   "destination Longitude: $destinationLong",
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 10),
                                 Text(
                                   "date: ${record.date.toString()}",
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  "Considered distance: ${record.consideredDistance.toStringAsFixed(2)}",
                                 ),
                               ],
                             ),
