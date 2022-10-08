@@ -1,26 +1,27 @@
-import 'dart:developer';
-import 'dart:math';
-
-import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:location_alarm/core/notification_utils.dart';
 
 class PositionUtils {
   static Future<Position?> getCurrentPosition() async {
-    final hasPermission = await _handleLocationPermission();
+    final hasPermission = await handleLocationPermission();
 
     if (!hasPermission) return null;
 
     Position? currentPosition;
-    currentPosition = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    print("**********currentPosition: $currentPosition**********");
+    currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
     return currentPosition;
   }
 
-  static Future<bool> _handleLocationPermission() async {
+  static Future<bool> handleLocationPermission(
+      {bool checkForAlwaysAccess = false}) async {
     bool serviceEnabled;
     LocationPermission permission;
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
+
     if (!serviceEnabled) {
+      await NotificationUtils.showNotification(body: "Please turn on the Location");
+
       return false;
     }
     permission = await Geolocator.checkPermission();
@@ -33,6 +34,6 @@ class PositionUtils {
     if (permission == LocationPermission.deniedForever) {
       return false;
     }
-    return true;
+    return checkForAlwaysAccess ? permission == LocationPermission.always : true;
   }
 }

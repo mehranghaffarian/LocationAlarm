@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:location_alarm/core/background_service_utils.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location_alarm/core/constant_data.dart';
 import 'package:location_alarm/core/extensions/build_context_extension.dart';
 import 'package:location_alarm/core/notification_utils.dart';
+import 'package:location_alarm/core/position_utils.dart';
 import 'package:location_alarm/presentation/pages/home_page/home_bloc.dart';
 import 'package:location_alarm/presentation/pages/choose_destination/choose_destination_page.dart';
 import 'package:location_alarm/presentation/widgets/custom_app_bar.dart';
@@ -27,8 +29,8 @@ class HomePage extends StatelessWidget {
 
   bool get tripIsValid =>
       double.tryParse(latController.text) != null &&
-      double.tryParse(longController.text) != null &&
-      double.tryParse(distanceController.text) != null;
+          double.tryParse(longController.text) != null &&
+          double.tryParse(distanceController.text) != null;
 
   @override
   Widget build(context) {
@@ -117,9 +119,17 @@ class HomePage extends StatelessWidget {
                   ElevatedButton(
                     style: ButtonStyle(
                       backgroundColor:
-                          MaterialStateProperty.all(theme.primaryColor),
+                      MaterialStateProperty.all(theme.primaryColor),
                     ),
                     onPressed: () async {
+                      if (!await PositionUtils.handleLocationPermission(
+                          checkForAlwaysAccess: true)) {
+                        NotificationUtils.showNotification(
+                            body: "This app needs to always have access to your location, please set it to Allow all the time in the app permissions in your settings.");
+                        await Geolocator.openAppSettings();
+
+                        return;
+                      }
                       if (tripIsValid) {
                         final service =
                             BackgroundServiceUtils.instance.backService;
@@ -128,11 +138,11 @@ class HomePage extends StatelessWidget {
                             ? 'unknown destination'
                             : destinationName.text;
                         final tripDestinationLat =
-                            double.parse(latController.text);
+                        double.parse(latController.text);
                         final tripDestinationLong =
-                            double.parse(longController.text);
+                        double.parse(longController.text);
                         final tripConsideredDistance =
-                            await _getConsideredDistance(distanceController.text);
+                        await _getConsideredDistance(distanceController.text);
 
                         if (!(await BackgroundServiceUtils
                             .instance.isTracingTravel)) {
@@ -154,19 +164,19 @@ class HomePage extends StatelessWidget {
                             service
                                 .invoke(ConstantData.chasingLocationTaskName, {
                               ConstantData.destinationLatKey:
-                                  tripDestinationLat,
+                              tripDestinationLat,
                               ConstantData.destinationLongKey:
-                                  tripDestinationLong,
+                              tripDestinationLong,
                               ConstantData.destinationNameKey:
-                                  tripDestinationName,
+                              tripDestinationName,
                               ConstantData.tripConsideredDistanceKey:
-                                  tripConsideredDistance,
+                              tripConsideredDistance,
                             });
                           }
                         } else {
                           NotificationUtils.showNotification(
                               body:
-                                  'you have a registered trip first cancel it');
+                              'you have a registered trip first cancel it');
                         }
                       } else {
                         context.showSnack(
@@ -183,7 +193,7 @@ class HomePage extends StatelessWidget {
                   ElevatedButton(
                     style: ButtonStyle(
                         backgroundColor:
-                            MaterialStateProperty.all(theme.errorColor)),
+                        MaterialStateProperty.all(theme.errorColor)),
                     onPressed: () async {
                       final service =
                           BackgroundServiceUtils.instance.backService;
@@ -286,10 +296,13 @@ class HomePage extends StatelessWidget {
 
             Future.delayed(
               const Duration(milliseconds: 500),
-              () => context.showSnack(
-                'Destination set successfully',
-                Theme.of(context).backgroundColor,
-              ),
+                  () =>
+                  context.showSnack(
+                    'Destination set successfully',
+                    Theme
+                        .of(context)
+                        .backgroundColor,
+                  ),
             );
           }
         },

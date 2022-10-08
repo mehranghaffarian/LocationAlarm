@@ -52,7 +52,7 @@ android {
         applicationId "com.example.loacation_alarm"
         minSdkVersion 28
         targetSdkVersion flutter.targetSdkVersion
-        versionCode 2
+        versionCode 3
         versionName flutterVersionName
     }
 
