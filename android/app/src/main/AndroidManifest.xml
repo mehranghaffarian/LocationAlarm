@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
    <application
 
-        android:label="loacation_alarm"
+        android:label="location alarm"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

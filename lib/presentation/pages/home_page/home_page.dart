@@ -128,7 +128,10 @@ class HomePage extends StatelessWidget {
                             body: "This app needs to always have access to your location, please set it to Allow all the time in the app permissions in your settings.");
                         await Geolocator.openAppSettings();
 
-                        return;
+                        if(!await PositionUtils.handleLocationPermission(
+                            checkForAlwaysAccess: true)) {
+                          return;
+                        }
                       }
                       if (tripIsValid) {
                         final service =
