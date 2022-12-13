@@ -15,6 +15,9 @@ class Settings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var isLogEnabled = false;
+    SharedPreferences.getInstance().then((value) =>
+    isLogEnabled = value.getBool(ConstantData.isLogEnabledKey) ?? false);
     final _cubit = CounterCubit(ConstantData.arrivedNotifCount);
 
     return Scaffold(
@@ -37,6 +40,8 @@ class Settings extends StatelessWidget {
               ConstantData.arrivedNotifCount = _cubit.state;
               (await SharedPreferences.getInstance())
                   .setInt(ConstantData.arrivedNotifCountKey, _cubit.state);
+              (await SharedPreferences.getInstance())
+                  .setBool(ConstantData.isLogEnabledKey, isLogEnabled);
 
               Navigator.of(context).pushNamed(HomePage.routeName);
             },
@@ -48,22 +53,30 @@ class Settings extends StatelessWidget {
         margin: const EdgeInsets.all(10),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Arrival Notifications Count: ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                    )),
-                _Counter(
-                  notifCounterCubit: _cubit,
-                ),
-              ],
-            ),
+            createSettingItem('Arrival Notifications Count: ', _Counter(
+              notifCounterCubit: _cubit,
+            ),),
+            createSettingItem("enable log", Switch(value: isLogEnabled,
+              onChanged: (value) {
+                isLogEnabled = value;
+              },),),
           ],
         ),
       ),
+    );
+  }
+
+  Row createSettingItem(String text, Widget child) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(text,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
+            )),
+        child,
+      ],
     );
   }
 }

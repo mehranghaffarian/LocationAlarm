@@ -116,12 +116,17 @@ Future<dynamic> backTask({
   required double consideredDistance,
   required String destinationName,
 }) async {
+  var isLogEnabled = false;
+  SharedPreferences.getInstance().then((value) =>
+      isLogEnabled = value.getBool(ConstantData.isLogEnabledKey) ?? false);
   await BackgroundServiceUtils.instance.setIsTracingTravel(true);
 
   NotificationUtils.showNotification(
     body:
         "now Im in the background, I will let you know when you have arrived.",
   );
+
+  double? previousDistance;
 
   while (true) {
     var currentPosition = await PositionUtils.getCurrentPosition();
@@ -166,9 +171,29 @@ Future<dynamic> backTask({
         ConstantData.tripConsideredDistanceKey: consideredDistance,
       });
       return true;
+    } else if (previousDistance == null ? false : previousDistance < distance) {
+      await NotificationUtils.showNotification(
+          body: "Seems you are getting further from your destination.");
     } else {
-      await Future.delayed(const Duration(seconds: 10), () {});
+      final double expectedRequiredTime = distance /
+          (previousDistance == null ? 1 : (previousDistance - distance)) /
+          10;
+      final double checkTimeDelay = expectedRequiredTime > 20
+          ? 20
+          : expectedRequiredTime < 5
+              ? 5
+              : expectedRequiredTime; //setting time to check again between 20 and 5 seconds
+
+      if (isLogEnabled) {
+        await NotificationUtils.showNotificationWithWatchDelay(
+          body:
+              'distance: $distance, checkTimeDelay: $checkTimeDelay, expectedRequiredTime: $expectedRequiredTime',
+        );
+      }
+
+      await Future.delayed(Duration(seconds: checkTimeDelay.toInt()), () {});
     }
+    previousDistance = distance;
   }
 }
 
